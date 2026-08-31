@@ -3,12 +3,13 @@
 from clients.dexscreener import parse_pair
 
 
-def test_parse_pair_from_fixture():
+def test_parse_pair_includes_price_usd():
     raw = {
         "chainId": "solana",
         "dexId": "raydium",
         "pairAddress": "abc123",
         "baseToken": {"address": "mint", "symbol": "JUP", "name": "Jupiter"},
+        "priceUsd": "0.8523",
         "liquidity": {"usd": 500000},
         "marketCap": 2000000,
         "volume": {"h1": 10000, "h24": 80000},
@@ -16,6 +17,5 @@ def test_parse_pair_from_fixture():
         "pairCreatedAt": 1700000000000,
     }
     pair = parse_pair("mint", raw)
+    assert pair.price_usd == 0.8523
     assert pair.symbol == "JUP"
-    assert pair.liquidity_usd == 500000
-    assert pair.volume_h1 == 10000

@@ -13,6 +13,7 @@ load_dotenv()
 SOL_MINT = "So11111111111111111111111111111111111111112"
 USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
 SOCIAL_BONUS_MAX = 20
+LAMPORTS_PER_SOL = 1_000_000_000
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,21 @@ class Config:
     position_size_usd: float
     poll_interval_sec: int
     project_root: Path
+    starting_cash_usd: float
+    slippage_bps: int
+    stop_loss_pct: float
+    take_profit_1_pct: float
+    take_profit_1_fraction: float
+    take_profit_2_pct: float
+    take_profit_2_fraction: float
+    trailing_stop_pct: float
+    trailing_activation_pct: float
+    time_stop_hours: float
+    lp_pull_drop_pct: float
+    max_concurrent_positions: int
+    max_daily_loss_usd: float
+    max_total_loss_usd: float
+    max_trades_per_day: int
 
     @classmethod
     def from_env(cls, project_root: Path | None = None) -> Config:
@@ -51,12 +67,27 @@ class Config:
             position_size_usd=float(os.getenv("POSITION_SIZE_USD", "12")),
             poll_interval_sec=int(os.getenv("POLL_INTERVAL_SEC", "60")),
             project_root=root,
+            starting_cash_usd=float(os.getenv("STARTING_CASH_USD", "100")),
+            slippage_bps=int(os.getenv("SLIPPAGE_BPS", "100")),
+            stop_loss_pct=float(os.getenv("STOP_LOSS_PCT", "8")),
+            take_profit_1_pct=float(os.getenv("TAKE_PROFIT_1_PCT", "15")),
+            take_profit_1_fraction=float(os.getenv("TAKE_PROFIT_1_FRACTION", "0.4")),
+            take_profit_2_pct=float(os.getenv("TAKE_PROFIT_2_PCT", "30")),
+            take_profit_2_fraction=float(os.getenv("TAKE_PROFIT_2_FRACTION", "0.4")),
+            trailing_stop_pct=float(os.getenv("TRAILING_STOP_PCT", "10")),
+            trailing_activation_pct=float(os.getenv("TRAILING_ACTIVATION_PCT", "10")),
+            time_stop_hours=float(os.getenv("TIME_STOP_HOURS", "48")),
+            lp_pull_drop_pct=float(os.getenv("LP_PULL_DROP_PCT", "30")),
+            max_concurrent_positions=int(os.getenv("MAX_CONCURRENT_POSITIONS", "3")),
+            max_daily_loss_usd=float(os.getenv("MAX_DAILY_LOSS_USD", "15")),
+            max_total_loss_usd=float(os.getenv("MAX_TOTAL_LOSS_USD", "30")),
+            max_trades_per_day=int(os.getenv("MAX_TRADES_PER_DAY", "5")),
         )
 
     @property
     def live_trading_enabled(self) -> bool:
-        """Whether live trading is enabled (burner wallet required)."""
-        return self.live_trading
+        """Live mode requires env flag AND an existing burner keypair."""
+        return self.live_trading and self.wallet_keypair_path.exists()
 
     @property
     def kill_switch_path(self) -> Path:

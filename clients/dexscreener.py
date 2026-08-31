@@ -15,12 +15,15 @@ def parse_pair(mint: str, raw: dict[str, Any]) -> PairSnapshot:
     volume = raw.get("volume") or {}
     price_change = raw.get("priceChange") or {}
     base = raw.get("baseToken") or {}
+    price_raw = raw.get("priceUsd")
+    price_usd = float(price_raw) if price_raw is not None else 0.0
 
     return PairSnapshot(
         mint=mint,
         symbol=base.get("symbol", "?"),
         name=base.get("name", "?"),
         pair_address=raw.get("pairAddress", ""),
+        price_usd=price_usd,
         liquidity_usd=float(liq.get("usd") or 0),
         market_cap_usd=float(raw.get("marketCap") or raw.get("fdv") or 0),
         volume_h1=float(volume.get("h1") or 0),
@@ -42,7 +45,7 @@ def fetch_token_pairs(mint: str) -> list[PairSnapshot]:
     if not isinstance(data, list):
         return []
 
-    pairs = [parse_pair(mint, p) for p in data if p.get("chainId") == "solana" or True]
+    pairs = [parse_pair(mint, p) for p in data]
     pairs.sort(key=lambda p: p.liquidity_usd, reverse=True)
     return pairs
 

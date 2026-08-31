@@ -1,80 +1,96 @@
-"""Tests for trading engine."""
+"""Tests for engine exit wiring and live fallback."""
 
+import json
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
-from config import Config
+from solders.keypair import Keypair
+
+from models import ExitReason
+from tests.conftest import make_config
+from tests.fixtures import GOOD_MOMENTUM, pair_at_price
 from engine import Engine
-from tests.fixtures import GOOD_MOMENTUM
 
 
-def _cfg(root: Path) -> Config:
-    return Config(
-        helius_rpc_url="http://localhost",
-        rugcheck_api_key="",
-        jupiter_api_key="",
-        telegram_bot_token="",
-        telegram_channel_ids=[],
-        live_trading=False,
-        wallet_keypair_path=root / "burner-keypair.json",
-        min_liquidity_usd=150_000,
-        min_token_age_hours=24,
-        max_top10_holder_pct=30,
-        min_score_to_buy=60,
-        position_size_usd=12,
-        poll_interval_sec=60,
-        project_root=root,
-    )
-
-
-def test_engine_respects_kill_switch():
+def test_engine_manage_exits_stop_loss():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        (root / "KILL").touch()
-        engine = Engine(_cfg(root))
-        assert engine.check_kill_switch() is True
-        ev = engine.evaluate_candidate(GOOD_MOMENTUM, skip_rpc=True)
-        assert engine.maybe_enter(ev) is False
-
-
-def test_engine_uses_live_trading_enabled():
-    import json
-    from solders.keypair import Keypair
-
-    with tempfile.TemporaryDirectory() as tmp:
-        root = Path(tmp)
-        kp_path = root / "burner-keypair.json"
-        kp = Keypair()
-        kp_path.write_text(json.dumps(list(bytes(kp))))
-
-        cfg = _cfg(root)
-        cfg = Config(
-            helius_rpc_url=cfg.helius_rpc_url,
-            rugcheck_api_key=cfg.rugcheck_api_key,
-            jupiter_api_key=cfg.jupiter_api_key,
-            telegram_bot_token=cfg.telegram_bot_token,
-            telegram_channel_ids=cfg.telegram_channel_ids,
-            live_trading=True,
-            wallet_keypair_path=kp_path,
-            min_liquidity_usd=cfg.min_liquidity_usd,
-            min_token_age_hours=cfg.min_token_age_hours,
-            max_top10_holder_pct=cfg.max_top10_holder_pct,
-            min_score_to_buy=cfg.min_score_to_buy,
-            position_size_usd=cfg.position_size_usd,
-            poll_interval_sec=cfg.poll_interval_sec,
-            project_root=root,
-        )
-        assert cfg.live_trading_enabled is True
+        cfg = make_config(root, stop_loss_pct=8.0)
         engine = Engine(cfg)
-        assert engine.cfg.live_trading_enabled is True
-        assert engine.live_trader is not None
+        engine.ledger.open_position("m1", "T", 1.0, 12, 200_000)
+        crash = pair_at_price(GOOD_MOMENTUM, 0.90, mint="m1", symbol="T")
+        closed = engine.manage_exits({"m1": crash})
+        assert len(closed) == 1
+        assert closed[0][1] == ExitReason.STOP_LOSS
+        assert engine.ledger.total_realized_pnl() != 0
 
 
-def test_paper_entry_on_approved():
+def test_live_requested_without_wallet_falls_back_to_paper():
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
-        engine = Engine(_cfg(root))
-        ev = engine.evaluate_candidate(GOOD_MOMENTUM, skip_rpc=True)
-        if ev.approved:
-            assert engine.maybe_enter(ev) is True
+        cfg = make_config(root, live_trading=True)
+        assert cfg.live_trading_enabled is False
+        engine = Engine(cfg)
+        assert engine.live_mode is False
+        assert engine.live_trader is None
+
+
+def test_live_mode_records_paper_ledger_on_success():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        kp = Keypair()
+        kp_path = root / "burner.json"
+        kp_path.write_text(json.dumps(list(bytes(kp))))
+        cfg = make_config(root, live_trading=True, wallet_keypair_path=kp_path)
+
+        with patch("trading.live.LiveTrader.buy_token") as mock_buy:
+            from models import TradeResult
+
+            mock_buy.return_value = TradeResult(True, signature="abc")
+            engine = Engine(cfg)
+            assert engine.live_mode is True
+            ev = engine.evaluate_candidate(GOOD_MOMENTUM, skip_rpc=True)
+            ok = engine.maybe_enter(ev)
+            assert ok is True
             assert len(engine.ledger.open_positions) == 1
+
+
+def test_live_failure_does_not_open_ledger():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        kp = Keypair()
+        kp_path = root / "burner.json"
+        kp_path.write_text(json.dumps(list(bytes(kp))))
+        cfg = make_config(root, live_trading=True, wallet_keypair_path=kp_path)
+
+        with patch("trading.live.LiveTrader.buy_token") as mock_buy:
+            from models import TradeResult
+
+            mock_buy.return_value = TradeResult(False, error="simulation failed")
+            engine = Engine(cfg)
+            ev = engine.evaluate_candidate(GOOD_MOMENTUM, skip_rpc=True)
+            ok = engine.maybe_enter(ev)
+            assert ok is False
+            assert len(engine.ledger.open_positions) == 0
+
+
+def test_no_entry_without_price():
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        engine = Engine(make_config(root))
+        no_price = pair_at_price(GOOD_MOMENTUM, 0.0)
+        from models import OnChainSignal, SafetyResult, SocialSignal, TokenEvaluation
+        from signals.onchain import compute_momentum
+
+        ev = TokenEvaluation(
+            pair=no_price,
+            onchain=compute_momentum(no_price),
+            social=SocialSignal(mint=no_price.mint, mention_count=0, telegram_mentioned=False),
+            safety=SafetyResult(True),
+            base_score=80,
+            social_bonus=0,
+            total_score=80,
+            approved=True,
+        )
+        assert engine.maybe_enter(ev) is False
