@@ -68,6 +68,10 @@ async function refreshCard(ctx: Context, draft: Draft): Promise<void> {
 
 // ── Commands ─────────────────────────────────────────────────────────────────
 
+bot.command('ping', async (ctx) => {
+  await ctx.reply('pong — bot is working')
+})
+
 bot.command('start', async (ctx) => {
   await ctx.reply(
     [

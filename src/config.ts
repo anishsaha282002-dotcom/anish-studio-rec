@@ -23,6 +23,8 @@ const bool = z
 const Schema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().min(20, 'Set TELEGRAM_BOT_TOKEN from @BotFather'),
   TELEGRAM_OWNER_IDS: csvNumbers,
+  /** Legacy alias — some setups use CHAT_ID instead of OWNER_IDS */
+  TELEGRAM_CHAT_ID: z.string().default(''),
   DRY_RUN: bool,
   LOG_LEVEL: z.string().default('info'),
   DB_PATH: z.string().default('./data/bot.db'),
@@ -58,7 +60,13 @@ if (!parsed.success) {
   process.exit(1)
 }
 
-export const config = parsed.data
+let ownerIds = parsed.data.TELEGRAM_OWNER_IDS
+if (ownerIds.length === 0 && parsed.data.TELEGRAM_CHAT_ID.trim()) {
+  const id = Number(parsed.data.TELEGRAM_CHAT_ID.trim())
+  if (Number.isInteger(id) && id > 0) ownerIds = [id]
+}
+
+export const config = { ...parsed.data, TELEGRAM_OWNER_IDS: ownerIds }
 
 if (config.TELEGRAM_OWNER_IDS.length === 0) {
   console.error(

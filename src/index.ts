@@ -1,5 +1,6 @@
 import { config } from './config.js'
 import { log } from './logger.js'
+import { isGenerateConfigured } from './generate/caption.js'
 import { bot } from './bot/index.js'
 import { startScheduler } from './queue/scheduler.js'
 import { connectedPlatforms } from './publishers/registry.js'
@@ -8,7 +9,13 @@ async function main(): Promise<void> {
   const connected = connectedPlatforms()
 
   log.info(
-    { dryRun: config.DRY_RUN, connected, owners: config.TELEGRAM_OWNER_IDS.length },
+    {
+      dryRun: config.DRY_RUN,
+      connected,
+      owners: config.TELEGRAM_OWNER_IDS.length,
+      aiGenerate: isGenerateConfigured(),
+      geminiKeyPrefix: config.GEMINI_API_KEY ? config.GEMINI_API_KEY.slice(0, 4) : 'none',
+    },
     'starting',
   )
 
