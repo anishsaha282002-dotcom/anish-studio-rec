@@ -1,6 +1,8 @@
 import { Bot, InlineKeyboard, InputFile, type Context } from 'grammy'
 import { config } from '../config.js'
 import { log } from '../logger.js'
+import { isGenerateConfigured } from '../generate/caption.js'
+import { generatePost } from '../generate/post.js'
 import { connectedPlatforms, publishAll, publishers } from '../publishers/registry.js'
 import {
   activeDraft,
@@ -13,8 +15,6 @@ import {
 } from '../store/db.js'
 import { PLATFORMS, PLATFORM_LABEL, type Draft, type MediaAsset, type PlatformId } from '../types.js'
 import { cardKeyboard, esc, renderCard, renderResults, retryKeyboard } from './card.js'
-import { isGenerateConfigured } from '../generate/caption.js'
-import { generatePost } from '../generate/post.js'
 
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN)
 
@@ -93,6 +93,8 @@ bot.command('status', async (ctx) => {
     ...PLATFORMS.map(
       (p) => `${conn.includes(p) ? '🟢' : '⚪️'} ${esc(PLATFORM_LABEL[p])}`,
     ),
+    '',
+    `${isGenerateConfigured() ? '🟢' : '⚪️'} AI generate \\(/generate\\)`,
     '',
     `drafts ${s.drafts} · published ${s.published} · failed ${s.failed} · queued ${s.queued}`,
   ]
