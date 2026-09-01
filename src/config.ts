@@ -44,6 +44,7 @@ const Schema = z.object({
 
   OPENAI_API_KEY: z.string().default(''),
   OPENAI_MODEL: z.string().default('gpt-4o-mini'),
+  OPENAI_IMAGE_MODEL: z.string().default('dall-e-3'),
 })
 
 const parsed = Schema.safeParse(process.env)

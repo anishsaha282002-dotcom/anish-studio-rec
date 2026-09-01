@@ -101,7 +101,9 @@ export function activeDraft(ownerId: number): Draft | undefined {
 
 export function updateDraft(
   id: number,
-  patch: Partial<Pick<Draft, 'state' | 'caption' | 'platforms' | 'cardMessageId' | 'scheduledFor'>>,
+  patch: Partial<
+    Pick<Draft, 'state' | 'caption' | 'platforms' | 'cardMessageId' | 'scheduledFor' | 'asset'>
+  >,
 ): void {
   const sets: string[] = []
   const vals: unknown[] = []
@@ -110,6 +112,7 @@ export function updateDraft(
   if (patch.platforms !== undefined) (sets.push('platforms = ?'), vals.push(patch.platforms.join(',')))
   if (patch.cardMessageId !== undefined) (sets.push('card_msg_id = ?'), vals.push(patch.cardMessageId))
   if (patch.scheduledFor !== undefined) (sets.push('scheduled_for = ?'), vals.push(patch.scheduledFor))
+  if (patch.asset !== undefined) (sets.push('asset_json = ?'), vals.push(JSON.stringify(patch.asset)))
   if (sets.length === 0) return
   vals.push(id)
   db.prepare(`UPDATE drafts SET ${sets.join(', ')} WHERE id = ?`).run(...vals)

@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard, type Context } from 'grammy'
+import { Bot, InlineKeyboard, InputFile, type Context } from 'grammy'
 import { config } from '../config.js'
 import { log } from '../logger.js'
 import { connectedPlatforms, publishAll, publishers } from '../publishers/registry.js'
@@ -13,7 +13,8 @@ import {
 } from '../store/db.js'
 import { PLATFORMS, PLATFORM_LABEL, type Draft, type MediaAsset, type PlatformId } from '../types.js'
 import { cardKeyboard, esc, renderCard, renderResults, retryKeyboard } from './card.js'
-import { generateCaption, isGenerateConfigured } from '../generate/caption.js'
+import { isGenerateConfigured } from '../generate/caption.js'
+import { generatePost } from '../generate/post.js'
 
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN)
 
@@ -74,7 +75,7 @@ bot.command('start', async (ctx) => {
       '',
       'Send me a video or photo to start a draft\\.',
       '',
-      '/generate \\<prompt\\> — AI writes a caption for you',
+      '/generate \\<prompt\\> — AI makes a full post \\(image \\+ caption\\)',
       '/status — what is connected',
       '/queue — scheduled posts',
       '/cancel — abort the current draft',
@@ -139,23 +140,49 @@ async function runGenerate(ctx: Context, prompt: string): Promise<void> {
   }
 
   const ownerId = ctx.from!.id
-  const thinking = await ctx.reply('✨ Generating caption…')
+  lastGeneratePrompt.set(ownerId, prompt)
+  const thinking = await ctx.reply('✨ Generating post \\(caption \\+ image\\)…')
 
   try {
-    const caption = await generateCaption(prompt)
-    lastGeneratePrompt.set(ownerId, prompt)
-    pendingGeneratedCaption.set(ownerId, caption)
+    const post = await generatePost(prompt)
 
-    const kb = new InlineKeyboard()
-      .text('🔄 Regenerate', 'gen:retry')
-      .text('❌ Clear', 'gen:clear')
-
-    await ctx.api.editMessageText(
+    const draft = createDraft(
+      ownerId,
       ctx.chat!.id,
-      thinking.message_id,
-      `*Generated caption:*\n\n${esc(caption)}\n\n_Send a photo or video — I'll use this caption\\._`,
-      { parse_mode: 'MarkdownV2', reply_markup: kb },
+      {
+        kind: 'photo',
+        fileId: 'pending',
+        bytes: post.buffer.length,
+        width: post.width,
+        height: post.height,
+        mimeType: 'image/png',
+      },
+      connectedPlatforms(),
     )
+    updateDraft(draft.id, { caption: post.caption, state: 'ready' })
+
+    const fresh = getDraft(draft.id)!
+    const msg = await ctx.replyWithPhoto(new InputFile(post.buffer, 'post.png'), {
+      caption: renderCard(fresh),
+      parse_mode: 'MarkdownV2',
+      reply_markup: cardKeyboard(fresh),
+    })
+
+    const photo = msg.photo[msg.photo.length - 1]!
+    updateDraft(draft.id, {
+      cardMessageId: msg.message_id,
+      asset: {
+        kind: 'photo',
+        fileId: photo.file_id,
+        bytes: photo.file_size ?? post.buffer.length,
+        width: photo.width,
+        height: photo.height,
+        mimeType: 'image/png',
+      },
+    })
+
+    await ctx.api.deleteMessage(ctx.chat!.id, thinking.message_id).catch(() => {})
+    pendingGeneratedCaption.delete(ownerId)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     await ctx.api.editMessageText(ctx.chat!.id, thinking.message_id, `❌ ${esc(msg)}`, {
@@ -344,21 +371,7 @@ bot.callbackQuery('gen:retry', async (ctx) => {
     return
   }
   await ctx.answerCallbackQuery('Regenerating…')
-  await ctx.editMessageText('✨ Regenerating…')
-  try {
-    const caption = await generateCaption(prompt)
-    pendingGeneratedCaption.set(ctx.from.id, caption)
-    const kb = new InlineKeyboard()
-      .text('🔄 Regenerate', 'gen:retry')
-      .text('❌ Clear', 'gen:clear')
-    await ctx.editMessageText(
-      `*Generated caption:*\n\n${esc(caption)}\n\n_Send a photo or video — I'll use this caption\\._`,
-      { parse_mode: 'MarkdownV2', reply_markup: kb },
-    )
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    await ctx.editMessageText(`❌ ${esc(msg)}`, { parse_mode: 'MarkdownV2' })
-  }
+  await runGenerate(ctx, prompt)
 })
 
 // ── Publishing ───────────────────────────────────────────────────────────────
