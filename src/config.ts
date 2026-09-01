@@ -41,6 +41,9 @@ const Schema = z.object({
   X_ACCESS_TOKEN: z.string().default(''),
 
   MEDIA_PUBLIC_BASE_URL: z.string().default(''),
+
+  OPENAI_API_KEY: z.string().default(''),
+  OPENAI_MODEL: z.string().default('gpt-4o-mini'),
 })
 
 const parsed = Schema.safeParse(process.env)

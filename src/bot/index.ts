@@ -13,6 +13,7 @@ import {
 } from '../store/db.js'
 import { PLATFORMS, PLATFORM_LABEL, type Draft, type MediaAsset, type PlatformId } from '../types.js'
 import { cardKeyboard, esc, renderCard, renderResults, retryKeyboard } from './card.js'
+import { generateCaption, isGenerateConfigured } from '../generate/caption.js'
 
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN)
 
@@ -32,6 +33,11 @@ bot.catch((err) => {
 
 /** Owners who tapped ✏️ Caption and whose next text message is the new caption. */
 const awaitingCaption = new Map<number, number>()
+
+/** AI-generated caption waiting to be applied to the next photo/video. */
+const pendingGeneratedCaption = new Map<number, string>()
+/** Last prompt per owner — used by Regenerate button. */
+const lastGeneratePrompt = new Map<number, string>()
 
 async function sendCard(ctx: Context, draft: Draft): Promise<void> {
   const text = renderCard(draft)
@@ -68,6 +74,7 @@ bot.command('start', async (ctx) => {
       '',
       'Send me a video or photo to start a draft\\.',
       '',
+      '/generate \\<prompt\\> — AI writes a caption for you',
       '/status — what is connected',
       '/queue — scheduled posts',
       '/cancel — abort the current draft',
@@ -111,28 +118,95 @@ bot.command('queue', async (ctx) => {
 bot.command('cancel', async (ctx) => {
   const d = activeDraft(ctx.from!.id)
   if (!d) {
+    awaitingCaption.delete(ctx.from!.id)
+    pendingGeneratedCaption.delete(ctx.from!.id)
     await ctx.reply('Nothing in progress\\.', { parse_mode: 'MarkdownV2' })
     return
   }
   updateDraft(d.id, { state: 'killed' })
   awaitingCaption.delete(ctx.from!.id)
+  pendingGeneratedCaption.delete(ctx.from!.id)
   await ctx.reply(`Draft \\#${d.id} discarded\\.`, { parse_mode: 'MarkdownV2' })
+})
+
+async function runGenerate(ctx: Context, prompt: string): Promise<void> {
+  if (!isGenerateConfigured()) {
+    await ctx.reply(
+      'Add OPENAI\\_API\\_KEY to your \\.env file first\\.\nGet one at platform\\.openai\\.com',
+      { parse_mode: 'MarkdownV2' },
+    )
+    return
+  }
+
+  const ownerId = ctx.from!.id
+  const thinking = await ctx.reply('✨ Generating caption…')
+
+  try {
+    const caption = await generateCaption(prompt)
+    lastGeneratePrompt.set(ownerId, prompt)
+    pendingGeneratedCaption.set(ownerId, caption)
+
+    const kb = new InlineKeyboard()
+      .text('🔄 Regenerate', 'gen:retry')
+      .text('❌ Clear', 'gen:clear')
+
+    await ctx.api.editMessageText(
+      ctx.chat!.id,
+      thinking.message_id,
+      `*Generated caption:*\n\n${esc(caption)}\n\n_Send a photo or video — I'll use this caption\\._`,
+      { parse_mode: 'MarkdownV2', reply_markup: kb },
+    )
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    await ctx.api.editMessageText(ctx.chat!.id, thinking.message_id, `❌ ${esc(msg)}`, {
+      parse_mode: 'MarkdownV2',
+    })
+  }
+}
+
+bot.command('generate', async (ctx) => {
+  const prompt = (ctx.message?.text ?? '').replace(/^\/generate(@\w+)?\s*/i, '').trim()
+  if (!prompt) {
+    await ctx.reply(
+      'Usage: /generate \\<your prompt\\>\n\nExample:\n/generate Exciting post about my new coffee shop opening downtown',
+      { parse_mode: 'MarkdownV2' },
+    )
+    return
+  }
+  await runGenerate(ctx, prompt)
+})
+
+bot.command('gen', async (ctx) => {
+  const prompt = (ctx.message?.text ?? '').replace(/^\/gen(@\w+)?\s*/i, '').trim()
+  if (!prompt) {
+    await ctx.reply('Usage: /gen \\<your prompt\\>', { parse_mode: 'MarkdownV2' })
+    return
+  }
+  await runGenerate(ctx, prompt)
 })
 
 // ── Media intake ─────────────────────────────────────────────────────────────
 
 async function startDraft(ctx: Context, asset: MediaAsset, caption: string): Promise<void> {
   const ownerId = ctx.from!.id
+  const generated = pendingGeneratedCaption.get(ownerId)
+  const finalCaption = caption || generated || ''
+  if (generated && !caption) pendingGeneratedCaption.delete(ownerId)
+
   const draft = createDraft(ownerId, ctx.chat!.id, asset, connectedPlatforms())
-  if (caption) {
-    updateDraft(draft.id, { caption, state: 'ready' })
+  if (finalCaption) {
+    updateDraft(draft.id, { caption: finalCaption, state: 'ready' })
   } else {
     awaitingCaption.set(ownerId, draft.id)
   }
   const fresh = getDraft(draft.id)!
   await sendCard(ctx, fresh)
-  if (!caption) {
+  if (!finalCaption) {
     await ctx.reply('Now send me the caption as a normal message\\.', { parse_mode: 'MarkdownV2' })
+  } else if (generated && !caption) {
+    await ctx.reply('Used your generated caption\\. Edit or post when ready\\.', {
+      parse_mode: 'MarkdownV2',
+    })
   }
 }
 
@@ -253,6 +327,38 @@ bot.callbackQuery(/^when:(\d+):(\d+)$/, async (ctx) => {
   await ctx.editMessageText(`⏰ Scheduled for ${esc(new Date(at).toUTCString())}`, {
     parse_mode: 'MarkdownV2',
   })
+})
+
+bot.callbackQuery('gen:clear', async (ctx) => {
+  pendingGeneratedCaption.delete(ctx.from.id)
+  await ctx.answerCallbackQuery('Cleared')
+  await ctx.editMessageText('Caption cleared\\. Send /generate to try again\\.', {
+    parse_mode: 'MarkdownV2',
+  })
+})
+
+bot.callbackQuery('gen:retry', async (ctx) => {
+  const prompt = lastGeneratePrompt.get(ctx.from.id)
+  if (!prompt) {
+    await ctx.answerCallbackQuery('No prompt saved')
+    return
+  }
+  await ctx.answerCallbackQuery('Regenerating…')
+  await ctx.editMessageText('✨ Regenerating…')
+  try {
+    const caption = await generateCaption(prompt)
+    pendingGeneratedCaption.set(ctx.from.id, caption)
+    const kb = new InlineKeyboard()
+      .text('🔄 Regenerate', 'gen:retry')
+      .text('❌ Clear', 'gen:clear')
+    await ctx.editMessageText(
+      `*Generated caption:*\n\n${esc(caption)}\n\n_Send a photo or video — I'll use this caption\\._`,
+      { parse_mode: 'MarkdownV2', reply_markup: kb },
+    )
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    await ctx.editMessageText(`❌ ${esc(msg)}`, { parse_mode: 'MarkdownV2' })
+  }
 })
 
 // ── Publishing ───────────────────────────────────────────────────────────────
