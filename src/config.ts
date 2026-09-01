@@ -42,9 +42,8 @@ const Schema = z.object({
 
   MEDIA_PUBLIC_BASE_URL: z.string().default(''),
 
-  OPENAI_API_KEY: z.string().default(''),
-  OPENAI_MODEL: z.string().default('gpt-4o-mini'),
-  OPENAI_IMAGE_MODEL: z.string().default('dall-e-3'),
+  GEMINI_API_KEY: z.string().default(''),
+  GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
 })
 
 const parsed = Schema.safeParse(process.env)

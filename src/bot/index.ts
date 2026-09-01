@@ -133,7 +133,7 @@ bot.command('cancel', async (ctx) => {
 async function runGenerate(ctx: Context, prompt: string): Promise<void> {
   if (!isGenerateConfigured()) {
     await ctx.reply(
-      'Add OPENAI\\_API\\_KEY to your \\.env file first\\.\nGet one at platform\\.openai\\.com',
+      'Add GEMINI\\_API\\_KEY to your \\.env file first\\.\nFree key: aistudio\\.google\\.com/apikey',
       { parse_mode: 'MarkdownV2' },
     )
     return
