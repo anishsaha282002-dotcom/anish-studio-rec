@@ -54,28 +54,43 @@ Call when you get this — text me what you think.
 
 ---
 
-## EMAIL — short follow-up (demo already shown, pricing to discuss)
+## EMAIL — send pricing (demo already shown)
 
-**Subject:** Vape Vibes — quick follow-up on the demo
+**Subject:** Vape Vibes — pricing for the phone demo
 
 ---
 
 Hi,
 
-Good speaking with you and walking through the **Vape Vibes** phone demo.
+Following up on the **Vape Vibes** demo we walked through — here’s **pricing** so you have it in writing.
 
-Quick recap of what you saw:
-- AI answers inbound calls and discloses it's an assistant
-- Handles hours, location, and common product questions from your script
-- Captures customer and wholesale inquiries with a summary after each call
+**What you already saw:**
+- AI answers calls (discloses it’s an assistant)
+- Hours, location, product FAQs from your script
+- Lead + wholesale inquiry capture with a summary after each call
 - Stays in bounds on age policy, stock, and pricing
 
-**Pricing** — happy to discuss what fits your setup (single shop vs multi-location, after-hours only vs 24/7, SMS alerts, etc.). No pressure; we can scope it on a quick call.
+---
 
-If you want to test it again on your own:
-**[DEMO PHONE]**
+**Starter** — after-hours + overflow  
+$249 setup · $199/mo  
+Good if you want to test without replacing your main line.
 
-Text or reply with a good time to talk numbers, or any changes you'd want before go-live.
+**Growth ⭐ Recommended** — 24/7 primary answering  
+$499 setup · $449/mo  
+Includes SMS/email alerts, weekly call summary, unlimited FAQ/menu updates, 30-day tuning.
+
+**Multi-Store** — 2+ locations  
+$999 setup · $699/mo  
+Per-store hours/FAQs, combined reporting, priority script changes.
+
+All plans: 90-day initial term · typical go-live **5–10 business days** after we finalize your script.
+
+---
+
+Happy to adjust scope (after-hours only, alerts, extra location) — reply or text a good time to talk through which tier fits.
+
+Demo line if you want another listen: **[DEMO PHONE]**
 
 Best,  
 **Anish**  
@@ -84,7 +99,7 @@ Best,
 
 ---
 
-## EMAIL — first touch (only if they haven't seen demo yet)
+## EMAIL — short follow-up (no pricing — use only if pricing sent separately)
 
 **Subject:** Vape Vibes AI phone demo — 2 min
 
