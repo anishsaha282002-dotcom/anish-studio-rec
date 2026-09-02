@@ -82,19 +82,39 @@ bot.command('start', async (ctx) => {
 bot.command('status', async (ctx) => {
   const s = stats()
   const conn = connectedPlatforms()
+  const aiReady = isGenerateConfigured()
   const lines = [
-    `*Status*  ${config.DRY_RUN ? '🧪 DRY RUN — not posting to socials' : '🔴 LIVE'}`,
+    `*Status*  ${config.DRY_RUN ? '🧪 DRY RUN' : '🔴 LIVE'}`,
     '',
     ...PLATFORMS.map(
       (p) => `${conn.includes(p) ? '🟢' : '⚪️'} ${esc(PLATFORM_LABEL[p])}`,
     ),
     '',
-    `${isGenerateConfigured() ? '🟢' : '⚪️'} AI generate \\(/generate\\)`,
+    `${aiReady ? '🟢' : '⚪️'} AI generate \\(/generate, /daily\\)`,
     '',
     `drafts ${s.drafts} · published ${s.published} · failed ${s.failed} · queued ${s.queued}`,
   ]
+
+  if (!aiReady) {
+    lines.push(
+      '',
+      '⚠️ *AI is not set up*',
+      'Add GEMINI\\_API\\_KEY to your \\.env file\\.',
+      'Free key: aistudio\\.google\\.com/apikey',
+      'Then restart the bot and try /daily or /generate',
+    )
+  } else if (config.DAILY_POST_ENABLED && config.DAILY_POST_PROMPT.trim()) {
+    lines.push(
+      '',
+      `📅 Daily posts ON at ${config.DAILY_POST_HOUR}:00 ${esc(config.DAILY_POST_TIMEZONE)}`,
+      'Try /daily to get a post now\\.',
+    )
+  } else if (config.DAILY_POST_ENABLED) {
+    lines.push('', '⚠️ Set DAILY\\_POST\\_PROMPT in \\.env for daily posts\\.')
+  }
+
   if (config.DRY_RUN) {
-    lines.push('', '_Set DRY\\_RUN=false in \\.env to post for real\\._')
+    lines.push('', '_DRY\\_RUN only affects auto\\-posting to socials\\. /generate still works\\._')
   }
   await ctx.reply(lines.join('\n'), { parse_mode: 'MarkdownV2' })
 })
@@ -133,8 +153,11 @@ bot.command('cancel', async (ctx) => {
 async function runGenerate(ctx: Context, prompt: string): Promise<void> {
   if (!isGenerateConfigured()) {
     await ctx.reply(
-      'Add GEMINI\\_API\\_KEY to your \\.env file first\\.\nFree key: aistudio\\.google\\.com/apikey',
-      { parse_mode: 'MarkdownV2' },
+      '⚠️ AI is not set up yet.\n\n' +
+        '1. Get a free key: aistudio.google.com/apikey\n' +
+        '2. Add to .env: GEMINI_API_KEY=your_key_here\n' +
+        '3. Restart the bot\n' +
+        '4. Try /daily or /generate again',
     )
     return
   }
@@ -213,8 +236,17 @@ bot.command('gen', async (ctx) => {
 })
 
 bot.command('daily', async (ctx) => {
-  await ctx.reply('✨ Making your post…')
   await deliverDailyPost(ctx.from!.id, ctx.chat!.id)
+})
+
+/** Catch common typos like /genreate, /genearte */
+bot.on('message:text', async (ctx, next) => {
+  const text = ctx.message.text.trim()
+  if (/^\/gen[ae]?r[ae]?te\b/i.test(text)) {
+    await ctx.reply('Did you mean /generate ?\n\nExample:\n/generate cool post about gaming')
+    return
+  }
+  await next()
 })
 
 bot.callbackQuery(/^daily:regen:(\d+)$/, async (ctx) => {
