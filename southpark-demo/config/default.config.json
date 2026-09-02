@@ -1,0 +1,41 @@
+{
+  "businessName": "Southpark Investments",
+  "assistantName": "Southpark Project Intake Assistant",
+  "demoProjectId": "SP-DEMO-001",
+  "demoProjectName": "Southpark Commercial Tenant Improvement — Example Project",
+  "demoTenantName": "Restaurant Tenant — Abilene",
+  "demoDisclaimer": "FICTIONAL DEMO — NOT REAL SOUTHPARK PROJECT DATA",
+  "prospectEntity": "Southpark Investments LLC",
+  "prospectContact": "Imran Hajani",
+  "prospectPhonePublic": "+18177570311",
+  "anchorProject": {
+    "name": "Kungfu China Express",
+    "tdlr": "TABS2025001324",
+    "address": "3398-D North 1st St, Abilene, TX 79603",
+    "estimatedCost": 350000,
+    "squareFeet": 4946,
+    "note": "Public TDLR record — reference in pitch only, not in live demo script"
+  },
+  "serviceAreas": ["Abilene", "Texas", "DFW", "Euless", "Dallas", "Fort Worth"],
+  "routingGroups": [
+    "Owner Approver",
+    "Property Manager",
+    "General Contractor",
+    "Design Partner",
+    "Broker",
+    "Vendor",
+    "Tenant Contact",
+    "Emergency Contact"
+  ],
+  "inquiryTypes": [
+    "Leasing",
+    "Bid",
+    "Schedule Update",
+    "RFI",
+    "Maintenance",
+    "Approval",
+    "Payment Question",
+    "Construction Update",
+    "Other"
+  ]
+}

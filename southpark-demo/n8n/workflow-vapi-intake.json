@@ -1,0 +1,226 @@
+{
+  "name": "Southpark Vapi End-of-Call Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "southpark-vapi-end-of-call",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Vapi End-of-Call Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "southpark-vapi-end-of-call"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mirrors southpark-demo/src/scoring/lead-scoring.ts\nconst config = {\n  serviceAreas: ($env.SERVICE_AREAS || 'Abilene,Texas,DFW').split(',').map(s => s.trim()),\n  acceptedServices: ($env.ACCEPTED_SERVICES || 'Commercial Renovation,Tenant Improvement,Restaurant Build-Out').split(',').map(s => s.trim()),\n  minimumBudget: Number($env.MINIMUM_BUDGET || 10000),\n  businessName: $env.BUSINESS_NAME || 'Southpark Construction',\n};\n\nconst body = $input.first().json.body ?? $input.first().json;\nconst structured = body.message?.analysis?.structuredData ?? body.analysis?.structuredData ?? {};\nconst call = body.message?.call ?? body.call ?? {};\n\nconst report = {\n  ...structured,\n  call_summary: structured.call_summary || body.message?.analysis?.summary || '',\n  call_id: structured.call_id || call.id || '',\n  recording_url: structured.recording_url || call.recordingUrl || '',\n  transcript_url: structured.transcript_url || call.transcriptUrl || '',\n  call_started_at: structured.call_started_at || call.startedAt || '',\n};\n\nfunction parseBudget(v) {\n  if (!v) return null;\n  const m = String(v).replace(/,/g,'').match(/\\$?\\s*(\\d+(?:\\.\\d+)?)\\s*(k|m)?/i);\n  if (!m) return null;\n  let n = parseFloat(m[1]);\n  if ((m[2]||'').toLowerCase()==='k') n *= 1000;\n  if ((m[2]||'').toLowerCase()==='m') n *= 1000000;\n  return n;\n}\n\nfunction e164(p) {\n  if (!p) return undefined;\n  const d = String(p).replace(/\\D/g,'');\n  if (d.length===10) return '+1'+d;\n  if (d.length===11 && d.startsWith('1')) return '+'+d;\n  return undefined;\n}\n\nconst hay = [report.scope_description, report.notes, report.call_summary, report.urgency].join(' ').toLowerCase();\nconst emergency = ['fire','injury','gas smell','flooding','electrical hazard','911'].some(k => hay.includes(k)) || report.urgency==='Emergency';\n\nlet lead_status = 'Needs Review';\nif (emergency) lead_status = 'Urgent';\nelse if (report.caller_type === 'New Lead') {\n  const loc = [report.project_location, report.city, report.zip_code].join(' ').toLowerCase();\n  const inArea = config.serviceAreas.some(a => loc.includes(a.toLowerCase())) || /texas|\\btx\\b|abilene|dallas|dfw/.test(loc);\n  const budget = parseBudget(report.budget_range);\n  const commercial = /commercial|restaurant|retail|office|tenant/.test((report.property_type||'') + (report.project_type||''));\n  const phone = e164(report.phone);\n  if (!inArea && /\\b(ca|ny|fl)\\b/.test(loc)) lead_status = 'Not a Fit';\n  else if (budget != null && budget < config.minimumBudget && !commercial) lead_status = 'Not a Fit';\n  else if (phone) lead_status = 'Qualified';\n}\n\nreturn [{ json: { report, lead_status, phone_e164: e164(report.phone), config } }];"
+      },
+      "id": "parse-and-score",
+      "name": "Parse and Score Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": "={{ $env.AIRTABLE_BASE_ID }}",
+        "table": "={{ $env.AIRTABLE_LEADS_TABLE || 'Leads' }}",
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Lead Status": "={{ $json.lead_status }}",
+            "Caller Type": "={{ $json.report.caller_type || 'Other' }}",
+            "Full Name": "={{ $json.report.full_name || '' }}",
+            "Phone": "={{ $json.phone_e164 || $json.report.phone || '' }}",
+            "Email": "={{ $json.report.email || '' }}",
+            "Project Type": "={{ $json.report.project_type || '' }}",
+            "Property Type": "={{ $json.report.property_type || '' }}",
+            "Project Location": "={{ $json.report.project_location || '' }}",
+            "City": "={{ $json.report.city || '' }}",
+            "Budget Range": "={{ $json.report.budget_range || '' }}",
+            "Timeline": "={{ $json.report.timeline || '' }}",
+            "Scope Description": "={{ $json.report.scope_description || '' }}",
+            "Call Summary": "={{ $json.report.call_summary || '' }}",
+            "Vapi Call ID": "={{ $json.report.call_id || '' }}",
+            "Follow-Up Status": "New"
+          }
+        }
+      },
+      "id": "airtable-create",
+      "name": "Create Airtable Lead",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2,
+      "position": [720, 300],
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Airtable Personal Access Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Parse and Score Lead').item.json.lead_status }}",
+                    "rightValue": "Qualified",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Qualified"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Parse and Score Lead').item.json.lead_status }}",
+                    "rightValue": "Urgent",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Urgent"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $('Parse and Score Lead').item.json.lead_status }}",
+                    "rightValue": "Needs Review",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Needs Review"
+            }
+          ]
+        }
+      },
+      "id": "route-by-status",
+      "name": "Route by Lead Status",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [960, 300]
+    },
+    {
+      "parameters": {
+        "from": "={{ $env.TWILIO_SMS_NUMBER }}",
+        "to": "={{ $env.OWNER_PHONE }}",
+        "message": "=New QUALIFIED {{ $env.BUSINESS_NAME }} lead\n\nName: {{ $('Parse and Score Lead').item.json.report.full_name }}\nPhone: {{ $('Parse and Score Lead').item.json.report.phone }}\nProject: {{ $('Parse and Score Lead').item.json.report.project_type }}\nLocation: {{ $('Parse and Score Lead').item.json.report.project_location }}\nBudget: {{ $('Parse and Score Lead').item.json.report.budget_range }}\nTimeline: {{ $('Parse and Score Lead').item.json.report.timeline }}\n\nScope: {{ $('Parse and Score Lead').item.json.report.scope_description }}"
+      },
+      "id": "sms-owner-qualified",
+      "name": "SMS Owner (Qualified)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1200, 180],
+      "credentials": {
+        "twilioApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Twilio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "={{ $env.TWILIO_SMS_NUMBER }}",
+        "to": "={{ $env.SALES_REP_PHONE }}",
+        "message": "=New lead: {{ $('Parse and Score Lead').item.json.report.full_name }}\n{{ $('Parse and Score Lead').item.json.report.project_type }} | {{ $('Parse and Score Lead').item.json.report.city }} | {{ $('Parse and Score Lead').item.json.report.budget_range }}\nPhone: {{ $('Parse and Score Lead').item.json.report.phone }}"
+      },
+      "id": "sms-sales-qualified",
+      "name": "SMS Sales (Qualified)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1200, 300],
+      "credentials": {
+        "twilioApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Twilio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "from": "={{ $env.TWILIO_SMS_NUMBER }}",
+        "to": "={{ $env.OWNER_PHONE }}",
+        "message": "=URGENT {{ $env.BUSINESS_NAME }} call\n\n{{ $('Parse and Score Lead').item.json.report.full_name }} | {{ $('Parse and Score Lead').item.json.report.phone }}\nIssue: {{ $('Parse and Score Lead').item.json.report.scope_description }}\n\nCaller instructed to call 911 if immediate danger."
+      },
+      "id": "sms-owner-urgent",
+      "name": "SMS Owner (Urgent)",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1200, 420],
+      "credentials": {
+        "twilioApi": {
+          "id": "REPLACE_WITH_CREDENTIAL_ID",
+          "name": "Twilio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: true, lead_status: $('Parse and Score Lead').item.json.lead_status } }}"
+      },
+      "id": "respond-webhook",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1440, 300]
+    }
+  ],
+  "connections": {
+    "Vapi End-of-Call Webhook": {
+      "main": [[{ "node": "Parse and Score Lead", "type": "main", "index": 0 }]]
+    },
+    "Parse and Score Lead": {
+      "main": [[{ "node": "Create Airtable Lead", "type": "main", "index": 0 }]]
+    },
+    "Create Airtable Lead": {
+      "main": [[{ "node": "Route by Lead Status", "type": "main", "index": 0 }]]
+    },
+    "Route by Lead Status": {
+      "main": [
+        [
+          { "node": "SMS Owner (Qualified)", "type": "main", "index": 0 },
+          { "node": "SMS Sales (Qualified)", "type": "main", "index": 0 }
+        ],
+        [{ "node": "SMS Owner (Urgent)", "type": "main", "index": 0 }],
+        [{ "node": "Respond to Webhook", "type": "main", "index": 0 }]
+      ]
+    },
+    "SMS Owner (Qualified)": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "SMS Sales (Qualified)": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    },
+    "SMS Owner (Urgent)": {
+      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
