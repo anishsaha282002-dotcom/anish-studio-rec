@@ -49,12 +49,7 @@ interface PermalinkResponse extends GraphErrorBody {
 
 /** Instagram fetches media from a public HTTPS URL — it will not accept file uploads. */
 export function resolveMediaUrl(asset: MediaAsset): string | undefined {
-  if (asset.publicUrl) return asset.publicUrl
-  if (config.MEDIA_PUBLIC_BASE_URL) {
-    const base = config.MEDIA_PUBLIC_BASE_URL.replace(/\/$/, '')
-    return `${base}/${encodeURIComponent(asset.fileId)}`
-  }
-  return undefined
+  return asset.publicUrl
 }
 
 function validate(asset: MediaAsset, caption: string): ValidationResult {

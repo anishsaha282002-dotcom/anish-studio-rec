@@ -113,6 +113,17 @@ Two infrastructure pieces you will need before Instagram works:
 
 ---
 
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Bot never replies | Set `TELEGRAM_OWNER_IDS` to **your user id** from @userinfobot (not a chat/channel id). The bot only responds to listed owners. |
+| Posts say "DRY RUN" | `DRY_RUN=true` in `.env` — set to `false` for live posting. |
+| Instagram upload fails | Configure `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, and `MEDIA_PUBLIC_BASE_URL`. Instagram needs a public HTTPS URL for your media. |
+| No platforms to post to | Send a photo/video, toggle platforms on the approval card, add a caption, tap ✅ Post now. |
+
+---
+
 ## Layout
 
 ```

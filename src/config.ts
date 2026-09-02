@@ -43,6 +43,10 @@ const Schema = z.object({
   X_ACCESS_TOKEN: z.string().default(''),
 
   MEDIA_PUBLIC_BASE_URL: z.string().default(''),
+  S3_ENDPOINT: z.string().default(''),
+  S3_BUCKET: z.string().default(''),
+  S3_ACCESS_KEY_ID: z.string().default(''),
+  S3_SECRET_ACCESS_KEY: z.string().default(''),
 
   GEMINI_API_KEY: z.string().default(''),
   GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
