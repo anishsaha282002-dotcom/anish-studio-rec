@@ -1,9 +1,7 @@
 # Vape Vibes — outreach text + email
 
 **Business:** Vape Vibes  
-**Use:** Copy/paste text + detailed follow-up email (same style as Southpark pitch)
-
-Replace `[DEMO PHONE]` with your live Vape Vibes demo line when assigned.
+Replace `[DEMO PHONE]` with your live line if needed.
 
 ---
 
@@ -56,20 +54,56 @@ Call when you get this — text me what you think.
 
 ---
 
-## TEXT (shorter)
+## EMAIL — short follow-up (demo already shown, pricing to discuss)
 
-```
-Hi — Vape Vibes AI demo ready.
+**Subject:** Vape Vibes — quick follow-up on the demo
 
-📞 [DEMO PHONE] (2 min)
+---
 
-Ask: open today? Geek Bar flavors? wholesale?
+Hi,
 
-PRICING
-Starter — $249 + $199/mo
-Growth ⭐ — $499 + $449/mo
-Multi-Store — $999 + $699/mo
+Good speaking with you and walking through the **Vape Vibes** phone demo.
 
-Text me after you call.
-— Anish
-```
+Quick recap of what you saw:
+- AI answers inbound calls and discloses it's an assistant
+- Handles hours, location, and common product questions from your script
+- Captures customer and wholesale inquiries with a summary after each call
+- Stays in bounds on age policy, stock, and pricing
+
+**Pricing** — happy to discuss what fits your setup (single shop vs multi-location, after-hours only vs 24/7, SMS alerts, etc.). No pressure; we can scope it on a quick call.
+
+If you want to test it again on your own:
+**[DEMO PHONE]**
+
+Text or reply with a good time to talk numbers, or any changes you'd want before go-live.
+
+Best,  
+**Anish**  
+[YOUR PHONE]  
+[YOUR EMAIL]
+
+---
+
+## EMAIL — first touch (only if they haven't seen demo yet)
+
+**Subject:** Vape Vibes AI phone demo — 2 min
+
+---
+
+Hi,
+
+Built a quick **AI phone demo** for **Vape Vibes** — answers calls, handles FAQs, captures leads/wholesale inquiries.
+
+**Call: [DEMO PHONE]** (2 min) — ask about hours, flavors, or a bulk order.
+
+Happy to walk through pricing once you've tried it. Text me what you think.
+
+Best,  
+**Anish**  
+[YOUR PHONE]
+
+---
+
+## Full detailed email (optional — only if they ask for written pricing)
+
+See `DETAILED_EMAIL_VAPE_VIBES.md`
