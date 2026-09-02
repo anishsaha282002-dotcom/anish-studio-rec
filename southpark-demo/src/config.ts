@@ -9,7 +9,7 @@ loadDotenv();
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const EnvSchema = z.object({
-  BUSINESS_NAME: z.string().default('Southpark Construction'),
+  BUSINESS_NAME: z.string().default('Southpark Investments'),
   ASSISTANT_NAME: z.string().default('Southpark Project Intake Assistant'),
   DEMO_PHONE_NUMBER: z.string().optional(),
   OWNER_NAME: z.string().default('Owner'),

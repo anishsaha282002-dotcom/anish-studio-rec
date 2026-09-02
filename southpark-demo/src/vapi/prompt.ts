@@ -1,8 +1,28 @@
 import type { AppConfig } from '../config.js';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const SYSTEM_PROMPT_TEMPLATE = `You are {{ASSISTANT_NAME}}, an AI virtual receptionist for {{BUSINESS_NAME}}, a construction, renovation, and tenant-improvement business.
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
-Your role is to answer inbound calls professionally, identify the caller's purpose, qualify potential construction leads, collect accurate project details, and prepare a concise structured summary for the owner and sales team.
+const TRANSCRIBER_KEYTERMS: string[] = JSON.parse(
+  readFileSync(resolve(__dirname, '../../config/vapi-keyterms.json'), 'utf8'),
+) as string[];
+
+/** Assistant may say these to end the call cleanly after intake. */
+export const END_CALL_PHRASES = [
+  'thank you for calling southpark investments',
+  'a team member will follow up',
+  'have a good day',
+];
+
+const SYSTEM_PROMPT_TEMPLATE = `You are {{ASSISTANT_NAME}}, an AI virtual receptionist for {{BUSINESS_NAME}}, a commercial construction, renovation, and tenant-improvement business.
+
+Your role is to answer inbound calls professionally, identify the caller's purpose, qualify potential construction leads, collect accurate project details, and prepare a concise structured summary for the owner and project team.
+
+CRITICAL — BUSINESS IDENTITY:
+- You ONLY represent {{BUSINESS_NAME}}. Never mention or reference any other business, restaurant, demo client, or prior assistant (e.g. Jamaican Cook Shop, Annapurna, Vape Vibes, Deko, Casa AI, or similar).
+- If asked about another company, say: "I'm the intake assistant for {{BUSINESS_NAME}} only. I can capture your project inquiry for our team."
 
 IDENTITY AND SAFETY RULES:
 - At the beginning of every call, clearly disclose that you are an AI virtual assistant.
@@ -141,7 +161,11 @@ export function buildSystemPrompt(config: AppConfig): string {
 }
 
 export function buildFirstMessage(config: AppConfig): string {
-  return `Thank you for calling ${config.businessName}. I'm the AI project intake assistant. I can capture your request and alert the project team. Are you calling about a new project, a vendor update, or a tenant or broker inquiry?`;
+  return `Thank you for calling ${config.businessName}. I'm the AI project intake assistant. I can capture your request and send a summary to the project team. Are you calling about a new project, a vendor update, or a tenant or broker inquiry?`;
+}
+
+export function buildTranscriberKeyterms(): string[] {
+  return TRANSCRIBER_KEYTERMS;
 }
 
 export const STRUCTURED_OUTPUT_SCHEMA = {
@@ -202,6 +226,14 @@ export function buildVapiAssistantPayload(config: AppConfig) {
   return {
     name: config.assistantName,
     firstMessage: buildFirstMessage(config),
+    endCallPhrases: END_CALL_PHRASES,
+    transcriber: {
+      provider: 'deepgram',
+      model: 'nova-2',
+      language: 'en',
+      smartFormat: true,
+      keyterm: buildTranscriberKeyterms(),
+    },
     model: {
       provider: 'openai',
       model: 'gpt-4o-mini',
