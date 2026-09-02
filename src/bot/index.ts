@@ -15,6 +15,7 @@ import {
 } from '../store/db.js'
 import { PLATFORMS, PLATFORM_LABEL, type Draft, type MediaAsset, type PlatformId } from '../types.js'
 import { cardKeyboard, esc, renderCard, renderResults, retryKeyboard } from './card.js'
+import { ensurePublicUrl } from '../media/storage.js'
 
 export const bot = new Bot(config.TELEGRAM_BOT_TOKEN)
 
@@ -92,7 +93,7 @@ bot.command('status', async (ctx) => {
   const s = stats()
   const conn = connectedPlatforms()
   const lines = [
-    `*Status*  ${config.DRY_RUN ? '🧪 DRY RUN' : '🔴 LIVE'}`,
+    `*Status*  ${config.DRY_RUN ? '🧪 DRY RUN — not posting to socials' : '🔴 LIVE'}`,
     '',
     ...PLATFORMS.map(
       (p) => `${conn.includes(p) ? '🟢' : '⚪️'} ${esc(PLATFORM_LABEL[p])}`,
@@ -102,6 +103,9 @@ bot.command('status', async (ctx) => {
     '',
     `drafts ${s.drafts} · published ${s.published} · failed ${s.failed} · queued ${s.queued}`,
   ]
+  if (config.DRY_RUN) {
+    lines.push('', '_Set DRY\\_RUN=false in \\.env to post for real\\._')
+  }
   await ctx.reply(lines.join('\n'), { parse_mode: 'MarkdownV2' })
 })
 
@@ -163,7 +167,7 @@ async function runGenerate(ctx: Context, prompt: string): Promise<void> {
         height: post.height,
         mimeType: 'image/png',
       },
-      connectedPlatforms(),
+      [...PLATFORMS],
     )
     updateDraft(draft.id, { caption: post.caption, state: 'ready' })
 
@@ -220,13 +224,17 @@ bot.command('gen', async (ctx) => {
 
 // ── Media intake ─────────────────────────────────────────────────────────────
 
+/** Platforms that need a public HTTPS media URL before publishing. */
+const NEEDS_PUBLIC_URL: PlatformId[] = ['instagram']
+
 async function startDraft(ctx: Context, asset: MediaAsset, caption: string): Promise<void> {
   const ownerId = ctx.from!.id
   const generated = pendingGeneratedCaption.get(ownerId)
   const finalCaption = caption || generated || ''
   if (generated && !caption) pendingGeneratedCaption.delete(ownerId)
 
-  const draft = createDraft(ownerId, ctx.chat!.id, asset, connectedPlatforms())
+  // Default to all platforms so you can dry-run even before credentials are set.
+  const draft = createDraft(ownerId, ctx.chat!.id, asset, [...PLATFORMS])
   if (finalCaption) {
     updateDraft(draft.id, { caption: finalCaption, state: 'ready' })
   } else {
@@ -387,7 +395,38 @@ export async function runPublish(ctx: Context | null, draft: Draft): Promise<voi
     (p) => publishers[p].validate(draft.asset, draft.caption).level !== 'block',
   )
 
-  const results = await publishAll(targets, draft.asset, draft.caption)
+  if (targets.length === 0) {
+    const text =
+      '*Nothing to publish* — select at least one platform and fix any blocked validation errors\\.'
+    if (ctx) {
+      await ctx.reply(text, { parse_mode: 'MarkdownV2' })
+    } else {
+      await bot.api.sendMessage(draft.chatId, text, { parse_mode: 'MarkdownV2' })
+    }
+    return
+  }
+
+  let asset = draft.asset
+  const needsUpload = !config.DRY_RUN && targets.some((p) => NEEDS_PUBLIC_URL.includes(p))
+
+  if (needsUpload && !asset.publicUrl) {
+    try {
+      if (ctx) await ctx.reply('⏳ Uploading media for publishing…')
+      asset = await ensurePublicUrl(config.TELEGRAM_BOT_TOKEN, asset)
+      updateDraft(draft.id, { asset })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const text = `*Upload failed* — ${esc(msg)}`
+      if (ctx) {
+        await ctx.reply(text, { parse_mode: 'MarkdownV2' })
+      } else {
+        await bot.api.sendMessage(draft.chatId, text, { parse_mode: 'MarkdownV2' })
+      }
+      return
+    }
+  }
+
+  const results = await publishAll(targets, asset, draft.caption)
   recordResults(draft.id, results, config.DRY_RUN)
   updateDraft(draft.id, { state: 'published' })
 
