@@ -15,22 +15,11 @@ import {
 } from '../store/db.js'
 import { PLATFORMS, PLATFORM_LABEL, type Draft, type MediaAsset, type PlatformId } from '../types.js'
 import { cardKeyboard, esc, renderCard, renderResults, retryKeyboard } from './card.js'
+import { ensurePublicUrl } from '../media/storage.js'
+import { bot } from './client.js'
+import { deliverDailyPost, pendingCaptions } from './daily-post.js'
 
-export const bot = new Bot(config.TELEGRAM_BOT_TOKEN)
-
-/** Owner allowlist. Everything else is dropped without a reply. */
-bot.use(async (ctx, next) => {
-  const id = ctx.from?.id
-  if (id === undefined || !config.TELEGRAM_OWNER_IDS.includes(id)) {
-    log.warn({ from: id, username: ctx.from?.username }, 'dropped update from non-owner')
-    return
-  }
-  await next()
-})
-
-bot.catch((err) => {
-  log.error({ err: err.error, update: err.ctx.update.update_id }, 'handler threw')
-})
+export { bot } from './client.js'
 
 /** Owners who tapped ✏️ Caption and whose next text message is the new caption. */
 const awaitingCaption = new Map<number, number>()
@@ -77,9 +66,11 @@ bot.command('start', async (ctx) => {
     [
       '*Social Command Center*',
       '',
-      'Send me a video or photo to start a draft\\.',
+      '📅 /daily — get today\'s post \\(image \\+ caption\\)',
+      '✨ /generate \\<prompt\\> — make a custom post on demand',
       '',
-      '/generate \\<prompt\\> — AI makes a full post \\(image \\+ caption\\)',
+      'Save the image, copy the caption, post manually to your socials\\.',
+      '',
       '/status — what is connected',
       '/queue — scheduled posts',
       '/cancel — abort the current draft',
@@ -91,6 +82,7 @@ bot.command('start', async (ctx) => {
 bot.command('status', async (ctx) => {
   const s = stats()
   const conn = connectedPlatforms()
+  const aiReady = isGenerateConfigured()
   const lines = [
     `*Status*  ${config.DRY_RUN ? '🧪 DRY RUN' : '🔴 LIVE'}`,
     '',
@@ -98,10 +90,32 @@ bot.command('status', async (ctx) => {
       (p) => `${conn.includes(p) ? '🟢' : '⚪️'} ${esc(PLATFORM_LABEL[p])}`,
     ),
     '',
-    `${isGenerateConfigured() ? '🟢' : '⚪️'} AI generate \\(/generate\\)`,
+    `${aiReady ? '🟢' : '⚪️'} AI generate \\(/generate, /daily\\)`,
     '',
     `drafts ${s.drafts} · published ${s.published} · failed ${s.failed} · queued ${s.queued}`,
   ]
+
+  if (!aiReady) {
+    lines.push(
+      '',
+      '⚠️ *AI is not set up*',
+      'Add GEMINI\\_API\\_KEY to your \\.env file\\.',
+      'Free key: aistudio\\.google\\.com/apikey',
+      'Then restart the bot and try /daily or /generate',
+    )
+  } else if (config.DAILY_POST_ENABLED && config.DAILY_POST_PROMPT.trim()) {
+    lines.push(
+      '',
+      `📅 Daily posts ON at ${config.DAILY_POST_HOUR}:00 ${esc(config.DAILY_POST_TIMEZONE)}`,
+      'Try /daily to get a post now\\.',
+    )
+  } else if (config.DAILY_POST_ENABLED) {
+    lines.push('', '⚠️ Set DAILY\\_POST\\_PROMPT in \\.env for daily posts\\.')
+  }
+
+  if (config.DRY_RUN) {
+    lines.push('', '_DRY\\_RUN only affects auto\\-posting to socials\\. /generate still works\\._')
+  }
   await ctx.reply(lines.join('\n'), { parse_mode: 'MarkdownV2' })
 })
 
@@ -139,8 +153,11 @@ bot.command('cancel', async (ctx) => {
 async function runGenerate(ctx: Context, prompt: string): Promise<void> {
   if (!isGenerateConfigured()) {
     await ctx.reply(
-      'Add GEMINI\\_API\\_KEY to your \\.env file first\\.\nFree key: aistudio\\.google\\.com/apikey',
-      { parse_mode: 'MarkdownV2' },
+      '⚠️ AI is not set up yet.\n\n' +
+        '1. Get a free key: aistudio.google.com/apikey\n' +
+        '2. Add to .env: GEMINI_API_KEY=your_key_here\n' +
+        '3. Restart the bot\n' +
+        '4. Try /daily or /generate again',
     )
     return
   }
@@ -163,7 +180,7 @@ async function runGenerate(ctx: Context, prompt: string): Promise<void> {
         height: post.height,
         mimeType: 'image/png',
       },
-      connectedPlatforms(),
+      [...PLATFORMS],
     )
     updateDraft(draft.id, { caption: post.caption, state: 'ready' })
 
@@ -218,7 +235,52 @@ bot.command('gen', async (ctx) => {
   await runGenerate(ctx, prompt)
 })
 
+bot.command('daily', async (ctx) => {
+  await deliverDailyPost(ctx.from!.id, ctx.chat!.id)
+})
+
+/** Catch common typos like /genreate, /genearte */
+bot.on('message:text', async (ctx, next) => {
+  const text = ctx.message.text.trim()
+  if (/^\/gen[ae]?r[ae]?te\b/i.test(text)) {
+    await ctx.reply('Did you mean /generate ?\n\nExample:\n/generate cool post about gaming')
+    return
+  }
+  await next()
+})
+
+bot.callbackQuery(/^daily:regen:(\d+)$/, async (ctx) => {
+  const ownerId = Number((ctx.match as string[])[1])
+  if (ctx.from.id !== ownerId) {
+    await ctx.answerCallbackQuery('Not your post')
+    return
+  }
+  await ctx.answerCallbackQuery('Regenerating…')
+  await deliverDailyPost(ownerId, ctx.chat!.id)
+})
+
+bot.callbackQuery(/^daily:caption:(\d+)$/, async (ctx) => {
+  const ownerId = Number((ctx.match as string[])[1])
+  if (ctx.from.id !== ownerId) {
+    await ctx.answerCallbackQuery('Not your post')
+    return
+  }
+  const caption = pendingCaptions.get(ownerId)
+  if (!caption) {
+    await ctx.answerCallbackQuery('Caption expired — run /daily again')
+    return
+  }
+  await ctx.answerCallbackQuery()
+  await ctx.reply(
+    ['📋 *Caption:*', '', esc(caption)].join('\n'),
+    { parse_mode: 'MarkdownV2' },
+  )
+})
+
 // ── Media intake ─────────────────────────────────────────────────────────────
+
+/** Platforms that need a public HTTPS media URL before publishing. */
+const NEEDS_PUBLIC_URL: PlatformId[] = ['instagram']
 
 async function startDraft(ctx: Context, asset: MediaAsset, caption: string): Promise<void> {
   const ownerId = ctx.from!.id
@@ -226,7 +288,8 @@ async function startDraft(ctx: Context, asset: MediaAsset, caption: string): Pro
   const finalCaption = caption || generated || ''
   if (generated && !caption) pendingGeneratedCaption.delete(ownerId)
 
-  const draft = createDraft(ownerId, ctx.chat!.id, asset, connectedPlatforms())
+  // Default to all platforms so you can dry-run even before credentials are set.
+  const draft = createDraft(ownerId, ctx.chat!.id, asset, [...PLATFORMS])
   if (finalCaption) {
     updateDraft(draft.id, { caption: finalCaption, state: 'ready' })
   } else {
@@ -387,7 +450,38 @@ export async function runPublish(ctx: Context | null, draft: Draft): Promise<voi
     (p) => publishers[p].validate(draft.asset, draft.caption).level !== 'block',
   )
 
-  const results = await publishAll(targets, draft.asset, draft.caption)
+  if (targets.length === 0) {
+    const text =
+      '*Nothing to publish* — select at least one platform and fix any blocked validation errors\\.'
+    if (ctx) {
+      await ctx.reply(text, { parse_mode: 'MarkdownV2' })
+    } else {
+      await bot.api.sendMessage(draft.chatId, text, { parse_mode: 'MarkdownV2' })
+    }
+    return
+  }
+
+  let asset = draft.asset
+  const needsUpload = !config.DRY_RUN && targets.some((p) => NEEDS_PUBLIC_URL.includes(p))
+
+  if (needsUpload && !asset.publicUrl) {
+    try {
+      if (ctx) await ctx.reply('⏳ Uploading media for publishing…')
+      asset = await ensurePublicUrl(config.TELEGRAM_BOT_TOKEN, asset)
+      updateDraft(draft.id, { asset })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      const text = `*Upload failed* — ${esc(msg)}`
+      if (ctx) {
+        await ctx.reply(text, { parse_mode: 'MarkdownV2' })
+      } else {
+        await bot.api.sendMessage(draft.chatId, text, { parse_mode: 'MarkdownV2' })
+      }
+      return
+    }
+  }
+
+  const results = await publishAll(targets, asset, draft.caption)
   recordResults(draft.id, results, config.DRY_RUN)
   updateDraft(draft.id, { state: 'published' })
 

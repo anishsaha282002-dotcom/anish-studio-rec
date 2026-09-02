@@ -1,7 +1,8 @@
 import { config } from './config.js'
 import { log } from './logger.js'
 import { isGenerateConfigured } from './generate/caption.js'
-import { bot } from './bot/index.js'
+import { bot } from './bot/client.js'
+import { startDailyScheduler } from './queue/daily.js'
 import { startScheduler } from './queue/scheduler.js'
 import { connectedPlatforms } from './publishers/registry.js'
 
@@ -14,6 +15,9 @@ async function main(): Promise<void> {
       connected,
       owners: config.TELEGRAM_OWNER_IDS.length,
       aiGenerate: isGenerateConfigured(),
+      dailyPost: config.DAILY_POST_ENABLED,
+      dailyHour: config.DAILY_POST_HOUR,
+      dailyTimezone: config.DAILY_POST_TIMEZONE,
       geminiKeyPrefix: config.GEMINI_API_KEY ? config.GEMINI_API_KEY.slice(0, 4) : 'none',
     },
     'starting',
@@ -24,10 +28,12 @@ async function main(): Promise<void> {
   }
 
   const timer = startScheduler()
+  const dailyTimer = startDailyScheduler()
 
   const stop = async (signal: string) => {
     log.info({ signal }, 'shutting down')
     clearInterval(timer)
+    clearInterval(dailyTimer)
     await bot.stop()
     process.exit(0)
   }
