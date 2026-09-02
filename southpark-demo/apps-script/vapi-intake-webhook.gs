@@ -11,6 +11,40 @@
 
 var OWNER_EMAIL = 'info.spam@gmail.com';
 
+/** Run this from the editor (▶ Run) to test email — pick testEmail in the dropdown first. */
+function testEmail() {
+  var fakeBody = {
+    message: {
+      call: { id: 'test_001' },
+      analysis: {
+        structuredData: {
+          lead_status: 'Qualified',
+          caller_type: 'New Lead',
+          full_name: 'Imran Test',
+          phone: '817-555-0100',
+          email: 'test@example.com',
+          project_type: 'Commercial Renovation',
+          property_type: 'Restaurant',
+          project_location: 'Abilene, TX',
+          budget_range: '$50,000',
+          timeline: 'Within 30 days',
+          scope_description: 'Restaurant build-out demo test',
+        },
+        summary: 'Test email from Apps Script — if you see this, Gmail works.',
+      },
+    },
+  };
+  var result = handleVapiWebhook(fakeBody);
+  Logger.log(JSON.stringify(result));
+}
+
+/** Visiting the deployed /exec URL in a browser should show this. */
+function doGet() {
+  return ContentService.createTextOutput(
+    JSON.stringify({ ok: true, email: OWNER_EMAIL, hint: 'POST Vapi end-of-call payloads here' }),
+  ).setMimeType(ContentService.MimeType.JSON);
+}
+
 function doPost(e) {
   try {
     var body = e.postData && e.postData.contents ? JSON.parse(e.postData.contents) : {};
