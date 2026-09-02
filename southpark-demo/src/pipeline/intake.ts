@@ -5,7 +5,6 @@ import { sendOwnerLeadEmail } from '../integrations/email.js';
 import { sendSms } from '../integrations/twilio.js';
 import {
   customerConfirmationSms,
-  demoLeadSummarySms,
   ownerNeedsReviewSms,
   ownerQualifiedSms,
   ownerUrgentSms,
@@ -30,18 +29,8 @@ export type IntakeResult = {
   };
 };
 
-function callerNotifyPhone(lead: NormalizedLead): string | undefined {
-  return lead.caller_phone_e164 ?? lead.phone_e164;
-}
-
-/** Simple demo flow: text whoever called + email owner. */
+/** Simple demo flow: email owner only (no SMS — zero Twilio cost). */
 async function processDemoIntake(lead: NormalizedLead, config: AppConfig, result: IntakeResult) {
-  const callerPhone = callerNotifyPhone(lead);
-  if (callerPhone) {
-    await sendSms(config, callerPhone, demoLeadSummarySms(lead, config));
-    result.smsSent.caller = true;
-  }
-
   const email = await sendOwnerLeadEmail(lead, config);
   if (email) {
     result.emailSent = { owner: true };
