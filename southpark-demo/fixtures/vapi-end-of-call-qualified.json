@@ -1,0 +1,32 @@
+{
+  "message": {
+    "type": "end-of-call-report",
+    "call": {
+      "id": "demo_call_001",
+      "startedAt": "2026-09-02T15:00:00.000Z",
+      "recordingUrl": "https://example.com/recordings/demo_call_001",
+      "transcriptUrl": "https://example.com/transcripts/demo_call_001"
+    },
+    "analysis": {
+      "structuredData": {
+        "caller_type": "New Lead",
+        "full_name": "Demo Test Caller",
+        "phone": "325-555-0100",
+        "email": "demo.test@example.com",
+        "project_type": "Commercial Renovation",
+        "property_type": "Restaurant",
+        "project_location": "123 Main St, Abilene, TX 79601",
+        "city": "Abilene",
+        "zip_code": "79601",
+        "scope_description": "Restaurant remodel including dining area and kitchen updates",
+        "budget_range": "$50,000",
+        "timeline": "Within 30 days",
+        "decision_maker": "Yes",
+        "preferred_next_step": "On-Site Estimate",
+        "urgency": "Routine",
+        "recommended_routing": "Sales Rep"
+      },
+      "summary": "Caller requested a commercial restaurant remodel estimate in Abilene with $50k budget and 30-day timeline."
+    }
+  }
+}

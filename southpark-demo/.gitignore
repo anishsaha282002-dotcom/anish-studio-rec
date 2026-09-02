@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.env
+config/vapi-assistant.payload.json
+docs/vapi-system-prompt.md

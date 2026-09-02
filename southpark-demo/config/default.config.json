@@ -1,0 +1,19 @@
+{
+  "businessName": "Southpark Construction",
+  "assistantName": "Southpark Project Intake Assistant",
+  "serviceAreas": ["Abilene", "Texas", "DFW", "Dallas", "Fort Worth", "Mesquite", "Plano", "Arlington"],
+  "acceptedServices": [
+    "Commercial Renovation",
+    "Tenant Improvement",
+    "Restaurant Build-Out",
+    "Retail Build-Out",
+    "Office Remodel",
+    "Interior Renovation",
+    "General Construction",
+    "Painting",
+    "Flooring",
+    "Drywall",
+    "Demolition"
+  ],
+  "minimumBudget": 10000
+}
