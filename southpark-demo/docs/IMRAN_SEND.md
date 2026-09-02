@@ -5,17 +5,75 @@
 
 ---
 
-## TEXT (copy/paste)
+## TEXT (copy/paste — formatted like the email)
 
 ```
-Imran — Anish here. Live demo is ready.
+Hi Imran — Anish here.
 
-Call (682) 727-3062 and say you need a restaurant build-out estimate in Abilene, about $50k budget, 30-day timeline. The AI qualifies you — summary goes to email.
+Demo + pricing are ready 👇
 
-Full pricing below. Takes 2 min.
+━━━━━━━━━━━━━━━━
+TRY IT (2 min)
+━━━━━━━━━━━━━━━━
+
+📞 (682) 727-3062
+
+Say this:
+"I need a commercial renovation estimate in Abilene — restaurant build-out, about $50k budget, within 30 days. My name is Imran Test."
+
+What happens:
+• AI answers right away
+• Asks project type, location, scope, budget, timeline
+• Captures everything — won't quote pricing or approve work
+
+Grill it on permits, vendors, change orders — it stays in bounds.
+
+━━━━━━━━━━━━━━━━
+PRICING
+━━━━━━━━━━━━━━━━
+
+Pilot
+$1,500 setup · $750/mo
+(one project)
+
+Operations Desk ⭐ RECOMMENDED
+$3,500 setup · $1,500/mo
+(90-day term · up to 3 projects)
+
+Portfolio
+$7,500+ setup · $3,000–5,000/mo
+
+━━━━━━━━━━━━━━━━
+
+Call when you get this — text me what you think.
 
 — Anish
+[YOUR PHONE]
 ```
+
+---
+
+## TEXT (shorter — if the above splits into multiple bubbles)
+
+```
+Hi Imran — Anish here. Demo + pricing ready.
+
+📞 (682) 727-3062 (2 min)
+
+Say: restaurant build-out in Abilene, ~$50k, 30-day timeline.
+
+PRICING
+Pilot — $1,500 + $750/mo
+Ops Desk ⭐ — $3,500 + $1,500/mo
+Portfolio — from $7,500 setup
+
+Text me after you call.
+— Anish
+```
+
+---
+
+## TEXT (original short version)
 
 ---
 
