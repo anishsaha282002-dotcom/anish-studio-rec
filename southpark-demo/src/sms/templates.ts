@@ -4,6 +4,7 @@ import type { NormalizedLead } from '../types/lead.js';
 function fill(template: string, lead: NormalizedLead, config: AppConfig): string {
   const vars: Record<string, string> = {
     BUSINESS_NAME: config.businessName,
+    lead_status: lead.lead_status,
     full_name: lead.full_name ?? 'Unknown',
     phone: lead.phone ?? lead.phone_e164 ?? 'Unknown',
     email: lead.email ?? 'Unknown',
@@ -20,6 +21,24 @@ function fill(template: string, lead: NormalizedLead, config: AppConfig): string
   };
 
   return template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => vars[key] ?? '');
+}
+
+export function demoLeadSummarySms(lead: NormalizedLead, config: AppConfig): string {
+  return fill(
+    `Southpark demo — your call summary
+
+Status: {{lead_status}}
+Name: {{full_name}}
+Project: {{project_type}} ({{property_type}})
+Location: {{project_location}}
+Budget: {{budget_range}} | Timeline: {{timeline}}
+
+Scope: {{scope_description}}
+
+{{notes}}`,
+    lead,
+    config,
+  );
 }
 
 export function ownerQualifiedSms(lead: NormalizedLead, config: AppConfig): string {

@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "functions": {
+    "api/webhook.js": {
+      "memory": 256,
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/webhooks/vapi/end-of-call", "destination": "/api/webhook" },
+    { "source": "/health", "destination": "/api/health" }
+  ]
+}

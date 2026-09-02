@@ -51,6 +51,8 @@ export type NormalizedLead = LeadReport & {
   lead_status: LeadStatus;
   caller_type: CallerType;
   phone_e164?: string;
+  /** Inbound caller ID from the phone network (who dialed in). */
+  caller_phone_e164?: string;
 };
 
 export const EMERGENCY_KEYWORDS = [

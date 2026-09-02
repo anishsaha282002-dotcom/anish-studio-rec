@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { extractLeadReport } from '../webhook/parse-vapi-payload.js';
+import { extractCallerPhoneE164, extractLeadReport } from '../webhook/parse-vapi-payload.js';
 
 describe('extractLeadReport', () => {
   it('extracts structured data from Vapi end-of-call payload', () => {
@@ -28,5 +28,15 @@ describe('extractLeadReport', () => {
     expect(report.call_id).toBe('call_123');
     expect(report.full_name).toBe('Jane Doe');
     expect(report.call_summary).toContain('Abilene');
+  });
+
+  it('extracts caller phone from customer.number', () => {
+    expect(
+      extractCallerPhoneE164({
+        message: {
+          call: { customer: { number: '+18177570311' } },
+        },
+      }),
+    ).toBe('+18177570311');
   });
 });

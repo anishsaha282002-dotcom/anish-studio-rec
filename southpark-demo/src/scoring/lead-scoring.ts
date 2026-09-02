@@ -160,13 +160,18 @@ export function scoreLead(report: LeadReport, config: AppConfig): LeadStatus {
   return 'Needs Review';
 }
 
-export function normalizeLead(report: LeadReport, config: AppConfig): NormalizedLead {
+export function normalizeLead(
+  report: LeadReport,
+  config: AppConfig,
+  callerPhoneE164?: string,
+): NormalizedLead {
   const lead_status = scoreLead(report, config);
   return {
     ...report,
     lead_status,
     caller_type: report.caller_type ?? 'Other',
     phone_e164: normalizePhoneToE164(report.phone),
+    caller_phone_e164: callerPhoneE164,
     recommended_routing:
       report.recommended_routing ??
       (lead_status === 'Urgent'

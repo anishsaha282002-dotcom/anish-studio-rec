@@ -16,7 +16,7 @@ const EnvSchema = z.object({
   OWNER_PHONE: z.string().optional(),
   SALES_REP_NAME: z.string().default('Sales Rep'),
   SALES_REP_PHONE: z.string().optional(),
-  OWNER_EMAIL: z.string().optional(),
+  OWNER_EMAIL: z.string().default('info.spam@gmail.com'),
   SALES_REP_EMAIL: z.string().optional(),
   SERVICE_AREAS: z.string().default('Abilene,Texas,DFW'),
   ACCEPTED_SERVICES: z.string().default(
@@ -45,6 +45,12 @@ const EnvSchema = z.object({
     .string()
     .optional()
     .transform((v) => v !== 'false'),
+  DEMO_MODE: z
+    .string()
+    .optional()
+    .transform((v) => v !== 'false'),
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(),
 });
 
 export type AppConfig = {
@@ -84,6 +90,11 @@ export type AppConfig = {
   webhookPath: string;
   enableCustomerSms: boolean;
   enableSalesSms: boolean;
+  demoMode: boolean;
+  email: {
+    resendApiKey?: string;
+    fromAddress?: string;
+  };
 };
 
 function parseList(value: string): string[] {
@@ -141,6 +152,11 @@ export function loadConfig(): AppConfig {
     webhookPath: env.WEBHOOK_PATH,
     enableCustomerSms: env.ENABLE_CUSTOMER_SMS,
     enableSalesSms: env.ENABLE_SALES_SMS,
+    demoMode: env.DEMO_MODE,
+    email: {
+      resendApiKey: env.RESEND_API_KEY,
+      fromAddress: env.EMAIL_FROM,
+    },
   };
 }
 

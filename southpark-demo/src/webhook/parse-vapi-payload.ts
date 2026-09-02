@@ -1,15 +1,19 @@
 import type { LeadReport } from '../types/lead.js';
 import { LeadReportSchema } from '../types/lead.js';
 
+type VapiCall = {
+  id?: string;
+  startedAt?: string;
+  recordingUrl?: string;
+  transcriptUrl?: string;
+  customer?: { number?: string };
+  phoneNumber?: { number?: string };
+};
+
 type VapiEndOfCallPayload = {
   message?: {
     type?: string;
-    call?: {
-      id?: string;
-      startedAt?: string;
-      recordingUrl?: string;
-      transcriptUrl?: string;
-    };
+    call?: VapiCall;
     analysis?: {
       structuredData?: Record<string, unknown>;
       summary?: string;
@@ -18,12 +22,7 @@ type VapiEndOfCallPayload = {
       structuredOutputs?: Record<string, { result?: Record<string, unknown> }>;
     };
   };
-  call?: {
-    id?: string;
-    startedAt?: string;
-    recordingUrl?: string;
-    transcriptUrl?: string;
-  };
+  call?: VapiCall;
   analysis?: {
     structuredData?: Record<string, unknown>;
     summary?: string;
@@ -47,6 +46,18 @@ function pickStructuredData(payload: VapiEndOfCallPayload): Record<string, unkno
   }
 
   return {};
+}
+
+export function extractCallerPhoneE164(payload: unknown): string | undefined {
+  const body = payload as VapiEndOfCallPayload;
+  const call = body.message?.call ?? body.call;
+  const raw = call?.customer?.number ?? call?.phoneNumber?.number;
+  if (!raw?.trim()) return undefined;
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length === 10) return `+1${digits}`;
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`;
+  if (raw.startsWith('+') && digits.length >= 10) return `+${digits}`;
+  return undefined;
 }
 
 export function extractLeadReport(payload: unknown): LeadReport {

@@ -1,9 +1,11 @@
 import type { AppConfig } from '../config.js';
 import type { NormalizedLead } from '../types/lead.js';
 import { createAirtableLead, updateAirtableLeadFlags } from '../integrations/airtable.js';
+import { sendOwnerLeadEmail } from '../integrations/email.js';
 import { sendSms } from '../integrations/twilio.js';
 import {
   customerConfirmationSms,
+  demoLeadSummarySms,
   ownerNeedsReviewSms,
   ownerQualifiedSms,
   ownerUrgentSms,
@@ -21,8 +23,30 @@ export type IntakeResult = {
     owner?: boolean;
     sales?: boolean;
     customer?: boolean;
+    caller?: boolean;
+  };
+  emailSent?: {
+    owner?: boolean;
   };
 };
+
+function callerNotifyPhone(lead: NormalizedLead): string | undefined {
+  return lead.caller_phone_e164 ?? lead.phone_e164;
+}
+
+/** Simple demo flow: text whoever called + email owner. */
+async function processDemoIntake(lead: NormalizedLead, config: AppConfig, result: IntakeResult) {
+  const callerPhone = callerNotifyPhone(lead);
+  if (callerPhone) {
+    await sendSms(config, callerPhone, demoLeadSummarySms(lead, config));
+    result.smsSent.caller = true;
+  }
+
+  const email = await sendOwnerLeadEmail(lead, config);
+  if (email) {
+    result.emailSent = { owner: true };
+  }
+}
 
 export async function processLeadIntake(
   lead: NormalizedLead,
@@ -32,6 +56,11 @@ export async function processLeadIntake(
     lead,
     smsSent: {},
   };
+
+  if (config.demoMode) {
+    await processDemoIntake(lead, config, result);
+    return result;
+  }
 
   const airtable = await createAirtableLead(lead, config);
   if (airtable) result.airtableRecordId = airtable.id;

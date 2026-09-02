@@ -2,7 +2,7 @@ import express from 'express';
 import pino from 'pino';
 import { loadConfig } from './config.js';
 import { normalizeLead } from './scoring/lead-scoring.js';
-import { extractLeadReport, verifyVapiWebhookSecret } from './webhook/parse-vapi-payload.js';
+import { extractCallerPhoneE164, extractLeadReport, verifyVapiWebhookSecret } from './webhook/parse-vapi-payload.js';
 import { processLeadIntake } from './pipeline/intake.js';
 
 const log = pino({ name: 'southpark-demo' });
@@ -28,7 +28,8 @@ app.post(config.webhookPath, async (req, res) => {
     }
 
     const report = extractLeadReport(req.body);
-    const lead = normalizeLead(report, config);
+    const callerPhone = extractCallerPhoneE164(req.body);
+    const lead = normalizeLead(report, config, callerPhone);
     const result = await processLeadIntake(lead, config);
 
     log.info(
