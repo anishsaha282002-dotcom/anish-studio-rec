@@ -1,55 +1,64 @@
 # Social Command Center
 
-A Telegram bot that is your control surface for publishing content. Send it a video, it shows you
-an approval card, you tap a button, it posts.
+A Telegram bot that **makes social media posts for you every day** — image + caption — so you can
+post them yourself. No Instagram API, no S3, no platform approvals needed.
 
-**Nothing publishes without your tap.** A scheduled post is a *deferred approved* post — you
-approved it, the queue just released it later. There is no autonomous posting path.
+**Recommended workflow:** Bot DMs you a fresh post each morning → save the image → copy the caption →
+post to Instagram/TikTok/etc. manually. Takes 30 seconds.
+
+Auto-posting to social platforms is optional and much harder to set up.
 
 ---
 
-## Run it in 5 minutes
-
-You do not need any platform approvals to see this working. It runs in dry-run mode out of the
-box: the full pipeline executes, validation is real, publishing is simulated.
+## Run it in 5 minutes (daily posts)
 
 ### 1. Create the bot
 
-Open Telegram → message **@BotFather** → `/newbot` → pick a name, then a username ending in `bot`.
-Copy the token it gives you.
+Open Telegram → message **@BotFather** → `/newbot` → copy the token.
 
 ### 2. Get your user id
 
-Message **@userinfobot**. It replies with your numeric id.
+Message **@userinfobot** → copy your numeric id.
 
-### 3. Configure
+### 3. Get a free AI key
+
+Go to [aistudio.google.com/apikey](https://aistudio.google.com/apikey) → create a free Gemini key.
+
+### 4. Configure
 
 ```bash
 cp .env.example .env
 ```
 
-Open `.env` and fill in exactly two things:
+Fill in `.env`:
 
 ```
-TELEGRAM_BOT_TOKEN=<the token from BotFather>
+TELEGRAM_BOT_TOKEN=<from BotFather>
 TELEGRAM_OWNER_IDS=<your numeric id>
+GEMINI_API_KEY=<free key from Google>
+DAILY_POST_PROMPT=Posts for my coffee shop downtown — specialty drinks, cozy vibe, local community
+DAILY_POST_HOUR=9
+DAILY_POST_TIMEZONE=America/New_York
 ```
 
-Leave everything else blank. Leave `DRY_RUN=true`.
-
-### 4. Run
+### 5. Run
 
 ```bash
 npm install
-npm run preflight   # sanity check — shows what is connected
+npm run preflight
 npm run dev
 ```
 
-### 5. Use it
+### 6. Use it
 
-Message your bot: send it a video. It replies with an approval card showing the video, the
-caption, per-platform validation, and buttons. Tap platform toggles, tap ✏️ Caption to set the
-text, tap ✅ Post now. In dry run it logs what it *would* post.
+Message your bot `/daily` to get a post right now. Every day at your set hour, the bot will DM you
+automatically.
+
+1. **Save the image** (long-press → save)
+2. **Copy the caption** from the next message
+3. **Post** to Instagram, TikTok, etc. yourself
+
+Tap 🔄 Regenerate if you want a different version.
 
 ---
 
@@ -57,12 +66,20 @@ text, tap ✅ Post now. In dry run it logs what it *would* post.
 
 | Command | Does |
 |---|---|
+| `/daily` | Get today's post now (image + caption) |
+| `/generate <prompt>` | Custom post on demand |
 | `/start` | Help |
-| `/status` | Dry-run or live, which platforms are connected, counts |
-| `/queue` | Scheduled posts, each cancellable |
-| `/cancel` | Discard the draft in progress |
+| `/status` | What's configured |
+| `/cancel` | Discard a draft in progress |
 
-Send a video or photo to start a draft. Everything else is buttons.
+---
+
+## Optional: auto-posting to socials
+
+This is **much harder** (Instagram API, Meta app approval, public media hosting). Most people
+should stick with the daily manual workflow above.
+
+Send a video or photo to start an approval-card draft for auto-posting. See below for platform setup.
 
 ---
 

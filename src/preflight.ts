@@ -6,30 +6,35 @@ import { PLATFORMS, PLATFORM_LABEL } from './types.js'
 
 const connected = connectedPlatforms()
 
-console.log(`\nmode: ${config.DRY_RUN ? 'DRY RUN (nothing posts to socials)' : '🔴 LIVE'}`)
+console.log(`\nmode: ${config.DRY_RUN ? 'DRY RUN (auto-posting disabled)' : '🔴 LIVE auto-posting'}`)
 console.log(`owners: ${config.TELEGRAM_OWNER_IDS.join(', ') || '(none — bot will refuse to start)'}\n`)
 
-for (const p of PLATFORMS) {
-  console.log(`  ${connected.includes(p) ? '✅' : '⬜'}  ${PLATFORM_LABEL[p]}`)
-}
-
-console.log(`  ${isMediaHostingConfigured() ? '✅' : '⬜'}  Media hosting (S3 + MEDIA_PUBLIC_BASE_URL)`)
-console.log(`  ${isGenerateConfigured() ? '✅' : '⬜'}  AI post generation (/generate)`)
+console.log('  Daily posts (recommended):')
+console.log(
+  `  ${config.DAILY_POST_ENABLED && isGenerateConfigured() && config.DAILY_POST_PROMPT.trim() ? '✅' : '⬜'}  Auto daily post at ${config.DAILY_POST_HOUR}:00 ${config.DAILY_POST_TIMEZONE}`,
+)
+console.log(`  ${isGenerateConfigured() ? '✅' : '⬜'}  GEMINI_API_KEY (free from aistudio.google.com/apikey)`)
+console.log(`  ${config.DAILY_POST_PROMPT.trim() ? '✅' : '⬜'}  DAILY_POST_PROMPT (describe your brand)`)
 console.log('')
 
-if (config.DRY_RUN) {
-  console.log('DRY_RUN is ON — the bot responds and simulates posts, but nothing hits your socials.')
-  console.log('Set DRY_RUN=false once Instagram credentials and media hosting are configured.\n')
+for (const p of PLATFORMS) {
+  console.log(`  ${connected.includes(p) ? '✅' : '⬜'}  ${PLATFORM_LABEL[p]} auto-post`)
 }
 
-if (!isMediaHostingConfigured()) {
-  console.log('Media hosting not configured — required for live Instagram posts.')
-  console.log('Set S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, MEDIA_PUBLIC_BASE_URL.\n')
+console.log(`  ${isMediaHostingConfigured() ? '✅' : '⬜'}  Media hosting (only needed for auto-posting)`)
+console.log('')
+
+if (!isGenerateConfigured() || !config.DAILY_POST_PROMPT.trim()) {
+  console.log('Quick start for daily posts:')
+  console.log('  1. Set GEMINI_API_KEY (free)')
+  console.log('  2. Set DAILY_POST_PROMPT — e.g. "Posts for my coffee shop downtown"')
+  console.log('  3. npm run dev → message bot /daily to test')
+  console.log('')
 }
 
-if (connected.length === 0) {
-  console.log('No social platforms connected yet — add credentials to .env when ready.')
-  console.log('You can still test the full flow in dry-run mode.\n')
+if (config.DAILY_POST_ENABLED && isGenerateConfigured() && config.DAILY_POST_PROMPT.trim()) {
+  console.log(`Daily posts ON — bot will DM you at ${config.DAILY_POST_HOUR}:00 ${config.DAILY_POST_TIMEZONE}.`)
+  console.log('Save the image, copy the caption, post to Instagram/TikTok yourself.\n')
 }
 
 process.exit(0)

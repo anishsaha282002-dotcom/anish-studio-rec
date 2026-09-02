@@ -50,6 +50,13 @@ const Schema = z.object({
 
   GEMINI_API_KEY: z.string().default(''),
   GEMINI_MODEL: z.string().default('gemini-2.0-flash'),
+
+  /** Auto-send a fresh post every day for manual social posting. */
+  DAILY_POST_ENABLED: bool,
+  DAILY_POST_HOUR: z.coerce.number().int().min(0).max(23).default(9),
+  DAILY_POST_TIMEZONE: z.string().default('UTC'),
+  /** Describe your brand — the bot uses this as the base prompt each day. */
+  DAILY_POST_PROMPT: z.string().default(''),
 })
 
 const parsed = Schema.safeParse(process.env)

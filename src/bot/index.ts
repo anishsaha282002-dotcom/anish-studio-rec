@@ -16,22 +16,10 @@ import {
 import { PLATFORMS, PLATFORM_LABEL, type Draft, type MediaAsset, type PlatformId } from '../types.js'
 import { cardKeyboard, esc, renderCard, renderResults, retryKeyboard } from './card.js'
 import { ensurePublicUrl } from '../media/storage.js'
+import { bot } from './client.js'
+import { deliverDailyPost, pendingCaptions } from './daily-post.js'
 
-export const bot = new Bot(config.TELEGRAM_BOT_TOKEN)
-
-/** Owner allowlist. Everything else is dropped without a reply. */
-bot.use(async (ctx, next) => {
-  const id = ctx.from?.id
-  if (id === undefined || !config.TELEGRAM_OWNER_IDS.includes(id)) {
-    log.warn({ from: id, username: ctx.from?.username }, 'dropped update from non-owner')
-    return
-  }
-  await next()
-})
-
-bot.catch((err) => {
-  log.error({ err: err.error, update: err.ctx.update.update_id }, 'handler threw')
-})
+export { bot } from './client.js'
 
 /** Owners who tapped ✏️ Caption and whose next text message is the new caption. */
 const awaitingCaption = new Map<number, number>()
@@ -78,9 +66,11 @@ bot.command('start', async (ctx) => {
     [
       '*Social Command Center*',
       '',
-      'Send me a video or photo to start a draft\\.',
+      '📅 /daily — get today\'s post \\(image \\+ caption\\)',
+      '✨ /generate \\<prompt\\> — make a custom post on demand',
       '',
-      '/generate \\<prompt\\> — AI makes a full post \\(image \\+ caption\\)',
+      'Save the image, copy the caption, post manually to your socials\\.',
+      '',
       '/status — what is connected',
       '/queue — scheduled posts',
       '/cancel — abort the current draft',
@@ -220,6 +210,39 @@ bot.command('gen', async (ctx) => {
     return
   }
   await runGenerate(ctx, prompt)
+})
+
+bot.command('daily', async (ctx) => {
+  await ctx.reply('✨ Making your post…')
+  await deliverDailyPost(ctx.from!.id, ctx.chat!.id)
+})
+
+bot.callbackQuery(/^daily:regen:(\d+)$/, async (ctx) => {
+  const ownerId = Number((ctx.match as string[])[1])
+  if (ctx.from.id !== ownerId) {
+    await ctx.answerCallbackQuery('Not your post')
+    return
+  }
+  await ctx.answerCallbackQuery('Regenerating…')
+  await deliverDailyPost(ownerId, ctx.chat!.id)
+})
+
+bot.callbackQuery(/^daily:caption:(\d+)$/, async (ctx) => {
+  const ownerId = Number((ctx.match as string[])[1])
+  if (ctx.from.id !== ownerId) {
+    await ctx.answerCallbackQuery('Not your post')
+    return
+  }
+  const caption = pendingCaptions.get(ownerId)
+  if (!caption) {
+    await ctx.answerCallbackQuery('Caption expired — run /daily again')
+    return
+  }
+  await ctx.answerCallbackQuery()
+  await ctx.reply(
+    ['📋 *Caption:*', '', esc(caption)].join('\n'),
+    { parse_mode: 'MarkdownV2' },
+  )
 })
 
 // ── Media intake ─────────────────────────────────────────────────────────────
